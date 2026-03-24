@@ -1,3 +1,5 @@
+#[cfg(feature = "ssr")]
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
@@ -158,8 +160,8 @@ impl User {
             self.username,
             self.email,
             self.password,
-            self.per_page_amount,
-            self.theme_mode,
+            default_per_page(),
+            default_theme_mode(),
         )
             .execute(crate::database::get_db())
             .await
@@ -208,5 +210,40 @@ WHERE username=$1",
         )
         .execute(crate::database::get_db())
         .await
+    }
+}
+
+#[cfg(feature = "ssr")]
+#[async_trait]
+impl axum_session_auth::Authentication<crate::models::User, String, sqlx::PgPool>
+    for crate::models::User
+{
+    async fn load_user(
+        userid: String,
+        pool: Option<&sqlx::PgPool>,
+    ) -> Result<crate::models::User, anyhow::Error> {
+        let db = pool.ok_or_else(|| anyhow::anyhow!("Database pool not available"))?;
+
+        let user = sqlx::query_as!(
+            crate::models::User,
+            "SELECT username, email, bio, image, NULL as password, per_page_amount, theme_mode FROM users WHERE username=$1",
+            userid
+        )
+        .fetch_one(db)
+        .await?;
+
+        Ok(user)
+    }
+
+    fn is_authenticated(&self) -> bool {
+        !self.username.is_empty()
+    }
+
+    fn is_active(&self) -> bool {
+        !self.username.is_empty()
+    }
+
+    fn is_anonymous(&self) -> bool {
+        false
     }
 }

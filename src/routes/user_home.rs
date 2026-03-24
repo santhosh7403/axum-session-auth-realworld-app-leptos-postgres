@@ -19,13 +19,12 @@ use crate::components::{
 #[server(HomeAction, "/api", "GetJson")]
 async fn home_articles(
     page: u32,
-    amount: u32,
+    amount: i32,
     tag: String,
     my_feed: bool,
 ) -> Result<Vec<crate::models::Article>, ServerFnError> {
     let page = i64::from(page);
     let amount = i64::from(amount);
-
     Ok(
         crate::models::Article::for_home_page(page, amount, tag, my_feed)
             .await
@@ -143,7 +142,7 @@ pub async fn fetch_results(
 /// Renders the home page of your application.
 #[component]
 pub fn HomePage(username: crate::auth::UsernameSignal) -> impl IntoView {
-    let per_page: RwSignal<Option<u32>> =
+    let per_page: RwSignal<Option<i32>> =
         use_context().expect("per_page context should be available");
     tracing::debug!("Starting HomePage component");
     let pagination = use_query::<crate::models::Pagination>();
@@ -501,7 +500,7 @@ fn SearchArticle(run_search: ServerAction<SearchAction>) -> impl IntoView {
     let global_state = expect_context::<Store<GlobalState>>();
 
     let search_in = move |ev| global_state.search_param().set(event_target_value(&ev));
-    let per_page: RwSignal<Option<u32>> =
+    let per_page: RwSignal<Option<i32>> =
         use_context().expect("per_page context should be available");
 
     view! {
@@ -535,7 +534,7 @@ fn YourFeedTab(
     username: RwSignal<Option<String>>,
     pagination: Memo<Result<Pagination, ParamsError>>,
 ) -> impl IntoView {
-    let per_page: RwSignal<Option<u32>> =
+    let per_page: RwSignal<Option<i32>> =
         use_context().expect("per_page context should be available");
     let global_state = expect_context::<Store<GlobalState>>();
 
@@ -597,7 +596,7 @@ fn YourFeedTab(
 
 #[component]
 fn GlobalFeedTab(pagination: Memo<Result<Pagination, ParamsError>>) -> impl IntoView {
-    let per_page: RwSignal<Option<u32>> =
+    let per_page: RwSignal<Option<i32>> =
         use_context().expect("per_page context should be available");
     let global_state = expect_context::<Store<GlobalState>>();
 

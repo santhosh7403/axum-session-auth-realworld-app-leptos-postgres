@@ -6,7 +6,7 @@ pub struct Pagination {
     tag: Option<String>,
     my_feed: Option<bool>,
     page: Option<u32>,
-    amount: Option<u32>,
+    amount: Option<i32>,
 }
 
 impl Pagination {
@@ -23,8 +23,8 @@ impl Pagination {
         self.page.unwrap_or_default()
     }
     #[inline]
-    pub fn get_amount(&self) -> u32 {
-        let per_page = expect_context::<RwSignal<Option<u32>>>();
+    pub fn get_amount(&self) -> i32 {
+        let per_page = expect_context::<RwSignal<Option<i32>>>();
         self.amount.unwrap_or(per_page.get_untracked().unwrap())
     }
 
@@ -35,7 +35,7 @@ impl Pagination {
     }
 
     #[inline]
-    pub fn set_amount(mut self, amount: u32) -> Self {
+    pub fn set_amount(mut self, amount: i32) -> Self {
         self.amount = Some(amount);
         self
     }
@@ -67,7 +67,7 @@ impl Pagination {
 
 impl Default for Pagination {
     fn default() -> Self {
-        let per_page = expect_context::<RwSignal<Option<u32>>>();
+        let per_page = expect_context::<RwSignal<Option<i32>>>();
         Self {
             tag: Some(String::new()),
             my_feed: Some(false),

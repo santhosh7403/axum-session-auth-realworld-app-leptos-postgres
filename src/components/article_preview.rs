@@ -46,7 +46,7 @@ pub fn ArticlePreviewList(
 fn ArticlePreview(username: crate::auth::UsernameSignal, article: ArticleSignal) -> impl IntoView {
     let pagination = leptos_router::hooks::use_query::<crate::models::Pagination>();
     let per_page =
-        use_context::<RwSignal<Option<u32>>>().expect("Should have the per_page signal from home");
+        use_context::<RwSignal<Option<i32>>>().expect("Should have the per_page signal from home");
 
     view! {
         <div class="mb-2 p-4 bg-white dark:bg-gray-800 dark:text-gray-100 rounded-lg shadow-md">

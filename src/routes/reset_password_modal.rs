@@ -18,6 +18,35 @@ struct EmailCredentials {
 #[cfg(feature = "ssr")]
 static EMAIL_CREDS: std::sync::OnceLock<EmailCredentials> = std::sync::OnceLock::new();
 
+#[cfg(feature = "ssr")]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub(crate) struct TokenClaims {
+    pub sub: String,
+    pub exp: usize,
+}
+
+#[cfg(feature = "ssr")]
+pub(crate) fn decode_token(
+    token: &str,
+) -> Result<jsonwebtoken::TokenData<TokenClaims>, jsonwebtoken::errors::Error> {
+    let secret = env!("JWT_SECRET");
+    jsonwebtoken::decode::<TokenClaims>(
+        token,
+        &jsonwebtoken::DecodingKey::from_secret(secret.as_bytes()),
+        &jsonwebtoken::Validation::default(),
+    )
+}
+
+#[cfg(feature = "ssr")]
+pub(crate) fn encode_token(token_claims: TokenClaims) -> jsonwebtoken::errors::Result<String> {
+    let secret = env!("JWT_SECRET");
+    jsonwebtoken::encode(
+        &jsonwebtoken::Header::default(),
+        &token_claims,
+        &jsonwebtoken::EncodingKey::from_secret(secret.as_bytes()),
+    )
+}
+
 #[tracing::instrument]
 #[server(ResetPasswordAction1, "/api")]
 pub async fn reset_password_1(email: String) -> Result<String, ServerFnError> {
@@ -87,7 +116,7 @@ pub async fn reset_password_2(
             "Passwords do not match, please retry!".to_string(),
         ));
     }
-    let Ok(claims) = crate::auth::decode_token(token.as_str()) else {
+    let Ok(claims) = decode_token(token.as_str()) else {
         tracing::info!("Invalid token provided");
         return Err(ServerFnError::new("Invalid token provided!".to_string()));
     };

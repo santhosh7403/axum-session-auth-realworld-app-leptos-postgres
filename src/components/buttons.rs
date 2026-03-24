@@ -19,26 +19,29 @@ pub async fn follow_action(other_user: String) -> Result<bool, ServerFnError> {
 #[tracing::instrument]
 async fn toggle_follow(current: String, other: String) -> Result<bool, sqlx::Error> {
     let db = crate::database::get_db();
+    let follower_id = sqlx::query_scalar!("SELECT id FROM Users WHERE username=$1", current).fetch_one(db).await?;
+    let influencer_id = sqlx::query_scalar!("SELECT id FROM Users WHERE username=$1", other).fetch_one(db).await?;
+    
     match sqlx::query!(
-        "SELECT * FROM Follows WHERE follower=$1 and influencer=$2",
-        current,
-        other
+        "SELECT * FROM Follows WHERE follower_id=$1 and influencer_id=$2",
+        follower_id,
+        influencer_id
     )
     .fetch_one(db)
     .await
     {
         Ok(_) => sqlx::query!(
-            "DELETE FROM Follows WHERE follower=$1 and influencer=$2",
-            current,
-            other
+            "DELETE FROM Follows WHERE follower_id=$1 and influencer_id=$2",
+            follower_id,
+            influencer_id
         )
         .execute(db)
         .await
         .map(|_| false),
         Err(sqlx::error::Error::RowNotFound) => sqlx::query!(
-            "INSERT INTO Follows(follower, influencer) VALUES ($1, $2)",
-            current,
-            other
+            "INSERT INTO Follows(follower_id, influencer_id) VALUES ($1, $2)",
+            follower_id,
+            influencer_id
         )
         .execute(db)
         .await
@@ -151,26 +154,27 @@ pub async fn fav_action(slug: String) -> Result<bool, ServerFnError> {
 #[tracing::instrument]
 async fn toggle_fav(slug: String, username: String) -> Result<bool, sqlx::Error> {
     let db = crate::database::get_db();
+    let user_id = sqlx::query_scalar!("SELECT id FROM Users WHERE username=$1", username).fetch_one(db).await?;
     match sqlx::query!(
-        "SELECT * FROM FavArticles WHERE article=$1 and username=$2",
+        "SELECT * FROM FavArticles WHERE article=$1 and user_id=$2",
         slug,
-        username
+        user_id
     )
     .fetch_one(db)
     .await
     {
         Ok(_) => sqlx::query!(
-            "DELETE FROM FavArticles WHERE article=$1 and username=$2",
+            "DELETE FROM FavArticles WHERE article=$1 and user_id=$2",
             slug,
-            username
+            user_id
         )
         .execute(db)
         .await
         .map(|_| false),
         Err(sqlx::error::Error::RowNotFound) => sqlx::query!(
-            "INSERT INTO FavArticles(article, username) VALUES ($1, $2)",
+            "INSERT INTO FavArticles(article, user_id) VALUES ($1, $2)",
             slug,
-            username
+            user_id
         )
         .execute(db)
         .await

@@ -68,15 +68,19 @@ async fn update_article(
 ) -> Result<String, sqlx::Error> {
     static BIND_LIMIT: usize = 65535;
     let mut transaction = crate::database::get_db().begin().await?;
+    let author_id = sqlx::query_scalar!("SELECT id FROM Users WHERE username=$1", author)
+        .fetch_one(transaction.as_mut())
+        .await?;
+        
     let (rows_affected, slug) = if !slug.is_empty() {
         (
             sqlx::query!(
-                "UPDATE Articles SET title=$1, description=$2, body=$3 WHERE slug=$4 and author=$5",
+                "UPDATE Articles SET title=$1, description=$2, body=$3 WHERE slug=$4 and author_id=$5",
                 article.title,
                 article.description,
                 article.body,
                 slug,
-                author,
+                author_id,
             )
             .execute(transaction.as_mut())
             .await?
@@ -86,12 +90,12 @@ async fn update_article(
     } else {
         let slug = uuid::Uuid::now_v7().to_string();
         (sqlx::query!(
-            "INSERT INTO Articles(slug, title, description, body, author) VALUES ($1, $2, $3, $4, $5)",
+            "INSERT INTO Articles(slug, title, description, body, author_id) VALUES ($1, $2, $3, $4, $5)",
             slug,
             article.title,
             article.description,
             article.body,
-            author
+            author_id
         )
         .execute(transaction.as_mut())
         .await?.rows_affected(),

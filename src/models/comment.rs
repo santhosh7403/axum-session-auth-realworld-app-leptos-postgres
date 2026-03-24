@@ -15,13 +15,15 @@ impl Comment {
         username: String,
         body: String,
     ) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
+        let db = crate::database::get_db();
+        let user_id = sqlx::query_scalar!("SELECT id FROM Users WHERE username=$1", username).fetch_one(db).await?;
         sqlx::query!(
-            "INSERT INTO Comments(article, username, body) VALUES ($1, $2, $3)",
+            "INSERT INTO Comments(article, user_id, body) VALUES ($1, $2, $3)",
             article,
-            username,
+            user_id,
             body
         )
-        .execute(crate::database::get_db())
+        .execute(db)
         .await
     }
 
@@ -29,8 +31,8 @@ impl Comment {
     pub async fn get_all(article: String) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query!(
             "
-        SELECT c.*, u.image FROM Comments as c
-            JOIN Users as u ON u.username=c.username
+        SELECT c.id, c.article, u.username, c.body, c.created_at, u.image FROM Comments as c
+            JOIN Users as u ON u.id=c.user_id
         WHERE c.article=$1
         ORDER BY c.created_at",
             article
@@ -52,8 +54,10 @@ impl Comment {
         id: i32,
         user: String,
     ) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
-        sqlx::query!("DELETE FROM Comments WHERE id=$1 and username=$2", id, user)
-            .execute(crate::database::get_db())
+        let db = crate::database::get_db();
+        let user_id = sqlx::query_scalar!("SELECT id FROM Users WHERE username=$1", user).fetch_one(db).await?;
+        sqlx::query!("DELETE FROM Comments WHERE id=$1 and user_id=$2", id, user_id)
+            .execute(db)
             .await
     }
 }

@@ -11,7 +11,7 @@ pub fn ItemsPerPage(username: crate::auth::UsernameSignal) -> impl IntoView {
     let favourite = move || query.with(|x| x.get("favourites").map(|_| true));
     let global_state = expect_context::<Store<GlobalState>>();
 
-    let per_page: RwSignal<Option<u32>> =
+    let per_page: RwSignal<Option<i32>> =
         use_context().expect("per_page context should be available");
 
     view! {
@@ -24,7 +24,7 @@ pub fn ItemsPerPage(username: crate::auth::UsernameSignal) -> impl IntoView {
                 class="focus:shadow-outline rounded border px-1 py-1 leading-tight text-gray-700 shadow focus:outline-none dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600"
                 // class="focus:shadow-outline rounded border px-1 py-1 leading-tight text-gray-700 shadow focus:outline-none"
                 on:change:target=move |ev| {
-                    let amount = ev.target().value().parse::<u32>().unwrap();
+                    let amount = ev.target().value().parse::<i32>().unwrap();
                     per_page.set(Some(amount));
 
                     // let username = use_context::<crate::auth::UsernameSignal>().expect("username context missing");

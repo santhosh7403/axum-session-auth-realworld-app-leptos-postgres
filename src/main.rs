@@ -3,11 +3,11 @@
 #[tokio::main]
 async fn main() {
     use axum::Router;
+    use axum_session_auth_realworld_app_leptos_postgres::app::*;
+    use axum_session_auth_realworld_app_leptos_postgres::database;
     use leptos::logging::log;
     use leptos::prelude::*;
     use leptos_axum::{generate_route_list, LeptosRoutes};
-    use realworld_app_leptos_axum::app::*;
-    use realworld_app_leptos_axum::database;
 
     let conf = get_configuration(None).unwrap();
     let addr = conf.leptos_options.site_addr;
@@ -23,6 +23,32 @@ async fn main() {
     database::init_db()
         .await
         .expect("problem during initialization of the database");
+
+    let pool = database::get_db().clone();
+
+    // Session Layer Config
+    let session_config = axum_session::SessionConfig::default()
+        .with_db_update_interval(chrono::Duration::try_seconds(30).unwrap_or_default())
+        .with_table_name("sessions_table");
+
+    let session_store = axum_session::SessionStore::<axum_session_sqlx::SessionPgPool>::new(
+        Some(pool.clone().into()),
+        session_config,
+    )
+    .await
+    .unwrap();
+
+    let session_layer = axum_session::SessionLayer::new(session_store);
+
+    // Auth Layer Config
+    let auth_config = axum_session_auth::AuthConfig::<String>::default();
+    let auth_layer = axum_session_auth::AuthSessionLayer::<
+        axum_session_auth_realworld_app_leptos_postgres::models::User,
+        String,
+        axum_session_sqlx::SessionPgPool,
+        sqlx::PgPool,
+    >::new(Some(pool))
+    .with_config(auth_config);
 
     let app = Router::new()
         .leptos_routes(&leptos_options, routes, {
@@ -43,9 +69,8 @@ async fn main() {
                     tower_http::trace::DefaultOnFailure::new().level(tracing::Level::DEBUG),
                 ),
         )
-        .layer(axum::middleware::from_fn(
-            realworld_app_leptos_axum::auth::auth_middleware,
-        ))
+        .layer(auth_layer)
+        .layer(session_layer)
         .with_state(leptos_options);
 
     // run our app with hyper

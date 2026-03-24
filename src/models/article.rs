@@ -36,17 +36,17 @@ SELECT
     (SELECT COUNT(*) FROM FavArticles WHERE article=a.slug) as favorites_count,
     (SELECT COUNT(*) FROM comments WHERE article=a.slug) as comments_count,
     u.username, u.image,
-    EXISTS(SELECT 1 FROM FavArticles WHERE article=a.slug and username=$5) as fav,
-    EXISTS(SELECT 1 FROM Follows WHERE follower=$5 and influencer=u.username) as following,
+    EXISTS(SELECT 1 FROM FavArticles WHERE article=a.slug and user_id=(SELECT id FROM Users WHERE username=$5)) as fav,
+    EXISTS(SELECT 1 FROM Follows WHERE follower_id=(SELECT id FROM Users WHERE username=$5) and influencer_id=u.id) as following,
     (SELECT string_agg(tag, ' ') FROM ArticleTags WHERE article = a.slug) as tag_list
 FROM Articles as a
-    JOIN Users as u ON a.author = u.username
+    JOIN Users as u ON a.author_id = u.id
 WHERE
     CASE WHEN $3!='' THEN a.slug in (SELECT distinct article FROM ArticleTags WHERE tag=$3)
     ELSE 1=1
     END
     AND
-    CASE WHEN $4 THEN u.username in (SELECT influencer FROM Follows WHERE follower=$5)
+    CASE WHEN $4 THEN u.id in (SELECT influencer_id FROM Follows WHERE follower_id=(SELECT id FROM Users WHERE username=$5))
     ELSE 1=1
     END
 ORDER BY a.created_at desc
@@ -102,15 +102,15 @@ SELECT
     u.image,
     (SELECT COUNT(*) FROM FavArticles WHERE article=a.slug) as favorites_count,
     (SELECT COUNT(*) FROM comments WHERE article=a.slug) as comments_count,
-    EXISTS(SELECT 1 FROM FavArticles WHERE article=a.slug and username=$2) as fav,
-    EXISTS(SELECT 1 FROM Follows WHERE follower=$2 and influencer=a.author) as following,
+    EXISTS(SELECT 1 FROM FavArticles WHERE article=a.slug and user_id=(SELECT id FROM Users WHERE username=$2)) as fav,
+    EXISTS(SELECT 1 FROM Follows WHERE follower_id=(SELECT id FROM Users WHERE username=$2) and influencer_id=a.author_id) as following,
     (SELECT string_agg(tag, ' ') FROM ArticleTags WHERE article = a.slug) as tag_list
 FROM Articles as a
-    JOIN Users as u ON u.username = a.author
+    JOIN Users as u ON u.id = a.author_id
 WHERE
     CASE WHEN $3 THEN
-        EXISTS(SELECT fa.article, fa.username FROM FavArticles as fa WHERE fa.article=a.slug AND fa.username=$1)
-    ELSE a.author = $1
+        EXISTS(SELECT fa.article, fa.user_id FROM FavArticles as fa WHERE fa.article=a.slug AND fa.user_id=(SELECT id FROM Users WHERE username=$1))
+    ELSE u.username = $1
     END",
             username,
             logged_user,
@@ -159,15 +159,15 @@ SELECT
     u.image,
     (SELECT COUNT(*) FROM FavArticles WHERE article=a.slug) as favorites_count,
     (SELECT COUNT(*) FROM comments WHERE article=a.slug) as comments_count,
-    EXISTS(SELECT 1 FROM FavArticles WHERE article=a.slug and username=$2) as fav,
-    EXISTS(SELECT 1 FROM Follows WHERE follower=$2 and influencer=a.author) as following,
+    EXISTS(SELECT 1 FROM FavArticles WHERE article=a.slug and user_id=(SELECT id FROM Users WHERE username=$2)) as fav,
+    EXISTS(SELECT 1 FROM Follows WHERE follower_id=(SELECT id FROM Users WHERE username=$2) and influencer_id=a.author_id) as following,
     (SELECT string_agg(tag, ' ') FROM ArticleTags WHERE article = a.slug) as tag_list
 FROM Articles as a
-    JOIN Users as u ON u.username = a.author
+    JOIN Users as u ON u.id = a.author_id
 WHERE
     CASE WHEN $3 THEN
-        EXISTS(SELECT fa.article, fa.username FROM FavArticles as fa WHERE fa.article=a.slug AND fa.username=$1)
-    ELSE a.author = $1
+        EXISTS(SELECT fa.article, fa.user_id FROM FavArticles as fa WHERE fa.article=a.slug AND fa.user_id=(SELECT id FROM Users WHERE username=$1))
+    ELSE u.username = $1
     END
     ORDER BY a.created_at desc
     LIMIT $4 OFFSET $5",
@@ -215,10 +215,10 @@ WHERE
         (SELECT COUNT(*) FROM FavArticles WHERE article = a.slug) as fav_count,
         (SELECT COUNT(*) FROM comments WHERE article = a.slug) as comments_count,
         u.*,
-        EXISTS(SELECT 1 FROM FavArticles WHERE article=a.slug and username=$2) as fav,
-        EXISTS(SELECT 1 FROM Follows WHERE follower=$2 and influencer=a.author) as following
+        EXISTS(SELECT 1 FROM FavArticles WHERE article=a.slug and user_id=(SELECT id FROM Users WHERE username=$2)) as fav,
+        EXISTS(SELECT 1 FROM Follows WHERE follower_id=(SELECT id FROM Users WHERE username=$2) and influencer_id=a.author_id) as following
     FROM Articles a
-        JOIN Users u ON a.author = u.username
+        JOIN Users u ON a.author_id = u.id
     WHERE slug = $1
     ",
             slug,
@@ -254,12 +254,16 @@ WHERE
         slug: String,
         author: String,
     ) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
+        let db = crate::database::get_db();
+        let author_id = sqlx::query_scalar!("SELECT id FROM Users WHERE username=$1", author)
+            .fetch_one(db)
+            .await?;
         sqlx::query!(
-            "DELETE FROM Articles WHERE slug=$1 and author=$2",
+            "DELETE FROM Articles WHERE slug=$1 and author_id=$2",
             slug,
-            author
+            author_id
         )
-        .execute(crate::database::get_db())
+        .execute(db)
         .await
     }
 }

@@ -18,11 +18,10 @@ pub async fn profile_articles(
     username: String,
     favourites: Option<bool>,
     page: u32,
-    amount: u32,
+    amount: i32,
 ) -> Result<Vec<crate::models::Article>, ServerFnError> {
     let page = i64::from(page);
     let amount = i64::from(amount);
-
     crate::models::Article::for_user_profile_home(
         username,
         favourites.unwrap_or_default(),
@@ -54,22 +53,35 @@ pub async fn user_profile(username: String) -> Result<UserProfileModel, ServerFn
             ServerFnError::new("Could not retrieve articles, try again later")
         })?;
     match crate::auth::get_username() {
-        Some(logged_user) => sqlx::query!(
-            "SELECT EXISTS(SELECT * FROM Follows WHERE follower=$2 and influencer=$1)",
-            username,
-            logged_user,
-        )
-        .fetch_one(crate::database::get_db())
-        .await
-        .map_err(|x| {
-            let err = format!("Error while getting user in user_profile: {x:?}");
-            tracing::error!("{err}");
-            ServerFnError::ServerError("Could not retrieve articles, try again later".into())
-        })
-        .map(|x| UserProfileModel {
-            user,
-            following: x.exists,
-        }),
+        Some(logged_user) => {
+            let db = crate::database::get_db();
+            let follower_id =
+                sqlx::query_scalar!("SELECT id FROM Users WHERE username=$1", logged_user)
+                    .fetch_one(db)
+                    .await
+                    .unwrap_or(0);
+            let influencer_id =
+                sqlx::query_scalar!("SELECT id FROM Users WHERE username=$1", username)
+                    .fetch_one(db)
+                    .await
+                    .unwrap_or(0);
+            sqlx::query!(
+                "SELECT EXISTS(SELECT * FROM Follows WHERE follower_id=$1 and influencer_id=$2)",
+                follower_id,
+                influencer_id,
+            )
+            .fetch_one(db)
+            .await
+            .map_err(|x| {
+                let err = format!("Error while getting user in user_profile: {x:?}");
+                tracing::error!("{err}");
+                ServerFnError::ServerError("Could not retrieve articles, try again later".into())
+            })
+            .map(|x| UserProfileModel {
+                user,
+                following: x.exists,
+            })
+        }
         None => Ok(UserProfileModel {
             user,
             following: None,
@@ -119,7 +131,7 @@ where
     C: Fn() + 'static + Copy + Send,
 {
     let pagination = use_query::<crate::models::Pagination>();
-    let per_page: RwSignal<Option<u32>> =
+    let per_page: RwSignal<Option<i32>> =
         use_context().expect("per_page context should be available");
 
     // let params = use_params_map();
@@ -179,7 +191,7 @@ fn UserArticlesTab<A>(
 where
     A: Fn() -> Option<bool> + 'static + Send,
 {
-    let per_page: RwSignal<Option<u32>> =
+    let per_page: RwSignal<Option<i32>> =
         use_context().expect("per_page context should be available");
     let global_state = expect_context::<Store<GlobalState>>();
 
@@ -229,7 +241,7 @@ fn FavouritedArticlesTab<A>(
 where
     A: Fn() -> Option<bool> + 'static + Send,
 {
-    let per_page: RwSignal<Option<u32>> =
+    let per_page: RwSignal<Option<i32>> =
         use_context().expect("per_page context should be available");
     let global_state = expect_context::<Store<GlobalState>>();
 

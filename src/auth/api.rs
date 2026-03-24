@@ -29,7 +29,9 @@ pub async fn signup_action(
     match validate_signup(username.clone(), email, password) {
         Ok(user) => match user.insert().await {
             Ok(_) => {
-                crate::auth::set_username(username).await;
+                if let Ok(auth) = leptos_axum::extract::<crate::auth::AuthSession>().await {
+                    auth.login_user(username);
+                }
                 // leptos_axum::redirect("/");
                 Ok(SignupResponse::Success)
             }
@@ -64,7 +66,9 @@ pub async fn login_action(username: String, password: String) -> Result<String, 
     .unwrap()
         == Some(1)
     {
-        crate::auth::set_username(username).await;
+        if let Ok(auth) = leptos_axum::extract::<crate::auth::AuthSession>().await {
+            auth.login_user(username);
+        }
         leptos_axum::redirect("/");
         Ok("Successful".to_string())
     } else {
@@ -77,12 +81,9 @@ pub async fn login_action(username: String, password: String) -> Result<String, 
 #[server(LogoutAction, "/api")]
 #[tracing::instrument]
 pub async fn logout_action() -> Result<(), ServerFnError> {
-    let response_options = use_context::<leptos_axum::ResponseOptions>().unwrap();
-    response_options.insert_header(
-        axum::http::header::SET_COOKIE,
-        axum::http::HeaderValue::from_str(crate::auth::REMOVE_COOKIE)
-            .expect("header value couldn't be set"),
-    );
+    if let Ok(auth) = leptos_axum::extract::<crate::auth::AuthSession>().await {
+        auth.logout_user();
+    }
     leptos_axum::redirect("/");
     // leptos_axum::redirect("/login");
     Ok(())
@@ -125,7 +126,7 @@ pub async fn update_theme_mode(theme: String) -> Result<(), ServerFnError> {
 
 #[server(UpdatePerPageAmount, "/api")]
 #[tracing::instrument]
-pub async fn update_per_page_amount(amount: u32) -> Result<(), ServerFnError> {
+pub async fn update_per_page_amount(amount: i32) -> Result<(), ServerFnError> {
     let Some(logged_user) = super::get_username() else {
         return Err(ServerFnError::ServerError("you must be logged in".into()));
     };
@@ -133,7 +134,7 @@ pub async fn update_per_page_amount(amount: u32) -> Result<(), ServerFnError> {
     match crate::models::User::get(logged_user).await {
         Ok(user) => {
             if let Err(err) = user
-                .set_per_page_amount(amount as i32)
+                .set_per_page_amount(amount)
                 .update_per_page_amount()
                 .await
             {

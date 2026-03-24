@@ -64,7 +64,7 @@ pub fn App() -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
     provide_meta_context();
     provide_context(Store::new(GlobalState::default()));
-    let per_page = RwSignal::new(Some(10u32));
+    let per_page = RwSignal::new(Some(10i32));
     provide_context(per_page);
     let theme_mode = RwSignal::new("dark".to_string());
     provide_context(theme_mode);
@@ -95,7 +95,7 @@ pub fn App() -> impl IntoView {
         user.get().map(|x| {
             if let Ok(u) = x {
                 username.set(Some(u.username()));
-                per_page.set(Some(u.per_page_amount() as u32));
+                per_page.set(Some(u.per_page_amount()));
                 theme_mode.set(u.theme_mode());
             } else {
                 username.set(None);
@@ -131,7 +131,7 @@ pub fn App() -> impl IntoView {
     provide_context(run_search);
 
     view! {
-        <Stylesheet id="leptos" href="/pkg/realworld-app-leptos-axum.css" />
+        <Stylesheet id="leptos" href="/pkg/axum-session-auth-realworld-app-leptos-postgres.css" />
         <Body {..} class=body_class />
 
         // sets the document title
