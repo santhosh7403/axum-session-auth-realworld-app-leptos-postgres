@@ -6,15 +6,44 @@
     <img src="https://raw.githubusercontent.com/leptos-rs/leptos/main/docs/logos/Leptos_logo_RGB.svg" alt="Leptos Logo">
 </picture>
 
-This repository hosts a **Leptos demo application** developed as part of my exploration and experimentation with the **Rust/Leptos framework**. This project is more complex than the previously shared [ demo-tools-app-leptos-07-actix-tailwind](https://github.com/santhosh7403/demo-tools-app-leptos-07-actix-tailwind) and is intended to serve as a **more realistic, working example** for developers considering Leptos for their next project. I hope this hands-on code provides valuable insight into the framework's capabilities.
+# Background
+
+A full-stack application built with [Leptos](https://leptos.dev/) and Postgres, implementing a RealWorld blog platform with **session-based authentication**.
 
 
-A comparative SQLite version of the application is also maintained [here.](https://github.com/santhosh7403/realworld-app-leptos-axum-sqlite) This alternative offers identical UI and functionality but features:
-1. An optimization for rapid deployment due to simplified database setup steps, contrasting with the more involved configuration of the PostgreSQL version.
-2. A minor difference in full-text search implementation, as the underlying database engines handle this feature differently.
+This repository builds upon the original [realworld-app-leptos-axum](https://github.com/santhosh7403/realworld-app-leptos-axum) by replacing the JWT-based authentication mechanism with a more traditional session-based approach using [axum_session](https://crates.io/crates/axum_session) and [axum_session_auth](https://crates.io/crates/axum_session_auth) crates.
+
+## Session-Based Authentication
+
+Rather than using stateless JWT tokens, this implementation leverages server-side session management where:
+- **Session State**: User sessions are managed server-side, providing better control and security
+- **axum_session**: Handles session storage, retrieval, and lifecycle management
+- **axum_session_auth**: Provides authentication middleware and user extraction utilities
+- **Security Benefits**: Sessions can be invalidated immediately, user context is always current, and CSRF protection is naturally built-in
+
+This approach is particularly well-suited for traditional web applications and demonstrates an alternative to JWT for Rust web development.
+
+I started with the original Leptos/Postgres implementation and adapted it to use session-based authentication as an exploration of different auth patterns in Rust fullstack applications.
+
+## Modified axum_session Version
+
+**Note**: This repository uses a **modified version** of `axum_session` and `axum_session_sqlx` to optimize database write patterns. This modification throttles frequent writes to the session table, reducing database load and improving performance. The `Cargo.toml` is configured to use this custom branch:
+
+```toml
+axum_session = { git = "https://github.com/santhosh7403/AxumSession.git", branch = "feature/throttle-db-updates", features = ["key-store"], optional = true }
+axum_session_sqlx = { git = "https://github.com/santhosh7403/AxumSession.git", branch = "feature/throttle-db-updates", features = ["postgres"], optional = true }
+```
+
+If you prefer to use the stable version from crates.io, you can update `Cargo.toml` to:
+```toml
+axum_session = { version = "0.18", features = ["key-store"], optional = true }
+axum_session_sqlx = { version = "0.7", features = ["postgres"], optional = true }
+```
+
+This modification is intended to be submitted as a PR to the upstream `axum_session` project.
 
 
-Before proceeding, you can view the application's functionality via the[ screenshots here ](https://github.com/santhosh7403/realworld-app-leptos-axum/blob/main/App_Screenshots.md).
+Before proceeding, you can view the application's functionality via the[ screenshots here ](https://github.com/santhosh7403/axum-session-auth-realworld-app-leptos-postgres/blob/main/App_Screenshots.md).
 
 ---
 
@@ -25,13 +54,14 @@ This application leverages the following core technologies and features:
 * Leptos
 * axum
 * Server-Side Rendering (SSR)
-* sqlite
-* fts5 (Full-Text Search)
+* postgres
+* fts (Full-Text Search)
 * Modal Windows
-* argon2 (Password Encryption)
+* axum_session (session based auth)
 * uuid
 * tailwindcss
 * fontawesome icons
+* nanoid (password reset token)
 
 ---
 
@@ -58,16 +88,16 @@ Ensure the following Rust toolchains and dependencies are installed:
 Clone the repository to your local machine:
 
 ```bash
-git clone https://github.com/santhosh7403/realworld-app-leptos-axum.git]
-cd realword-app-leptos-axum
+git clone https://github.com/santhosh7403/axum-session-auth-realworld-app-leptos-postgres.git]
+cd axum-session-auth-realworld-app-leptos-postgres
 ```
 
 
 ### Database Initialization
 
-1. `source .env` - set the DATABASE_URL env variable
+1. `source .env` - to set the DATABASE_URL env variable
 
-2, Follow the steps in [ README_DATABASE.md ](https://github.com/santhosh7403/realworld-app-leptos-axum-sqlite/blob/main/README_DATABASE.md) to initialize the database schema and data.
+2, Follow the steps in [ README_DATABASE.md ](https://github.com/santhosh7403/axum-session-auth-realworld-app-leptos-postgres/blob/main/README_DATABASE.md) to initialize the database schema and data.
 
 ### Run Application
 
@@ -93,7 +123,7 @@ Sample application screens.
 
 
 
-More screenshots are [ available here ](https://github.com/santhosh7403/realworld-app-leptos-axum/blob/main/App_Screenshots.md)
+More screenshots are [ available here ](https://github.com/santhosh7403/axum-session-auth-realworld-app-leptos-postgres/blob/main/App_Screenshots.md)
 
 ---
 
@@ -105,7 +135,7 @@ The application is pre-populated with sample users and data for immediate testin
 
 2.   Password: The password is the same as the username (e.g., user1 has a password of user1).
 
-To remove this default data, delete the basedata files within the `./migrations` folder and follow the database setup steps outlined in the [README_DATABASE.md](https://github.com/santhosh7403/realworld-app-leptos-axum-sqlite/blob/main/README_DATABASE.md).
+To remove this default data, delete the base data files within the `./migrations` folder and follow the database setup steps outlined in the [README_DATABASE.md](https://github.com/santhosh7403/axum-session-auth-realworld-app-leptos-postgres/blob/main/README_DATABASE.md).
 
 ---
 
@@ -114,6 +144,18 @@ To remove this default data, delete the basedata files within the `./migrations`
 The application features a robust full-text search capability powered by PostgreSQL Full Text Search, which indexes three key fields from the `articles` table. For developers interested in the implementation or experimenting with different search methodologies, comprehensive documentation is available in the PostgreSQL [documentation here. ](https://www.postgresql.org/docs/17/textsearch.html)
 
 Another blog post on [PostgreSQL Full Text Search](https://iniakunhuda.medium.com/postgresql-full-text-search-a-powerful-alternative-to-elasticsearch-for-small-to-medium-d9524e001fe0)
+
+## 🏗️ Other Variants
+
+If you are looking for this same application with different frameworks or databases, check out these versions:
+
+| Framework | Database | Auth Type | Repository |
+| :--- | :--- | :--- | :--- |
+| **Leptos** | PostgreSQL | Session | *This Repository* |
+| **Leptos** | PostgreSQL | JWT | [View Repo](https://github.com/santhosh7403/realworld-app-leptos-axum) |
+| **Leptos** | SQLite | JWT | [View Repo](https://github.com/santhosh7403/realworld-app-leptos-axum-sqlite) |
+| **Dioxus** | SQLite | Session | [View Repo](https://github.com/santhosh7403/axum-session-auth-realworld-app-dioxus-sqlite) |
+| **Dioxus** | SQLite | JWT | [View Repo](https://github.com/santhosh7403/realworld-app-dioxus-sqlite) |
 
 
 ## 🙏 Inspiration and Acknowledgements
@@ -126,6 +168,10 @@ This particular version was initiated during the transition from Leptos 0.6 to 0
 
 *   Implementation of modal windows and re-wired page navigation.
 
-*   Integration of SQLite FTS5 for comprehensive full-text search capabilities.
+*   Integration of Postgres FTS for comprehensive full-text search capabilities.
 
-*   An updated, non-reloading pagination method for search results
+*   An updated, non-reloading pagination method for search results.
+
+*   Dark mode styling and user prefernce persistence.
+
+*   Implementation of Session based auth.

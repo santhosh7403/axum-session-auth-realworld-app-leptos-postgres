@@ -83,14 +83,14 @@ Let's use the sqlx-cli command-line utility to help us easily drop, create, or r
 
 It is critical to set the `DATABASE_URL` environment variable before running any sqlx commands, as they operate directly on its value. This is typically done by running the `source .env` command from the project root folder.
 
-To install sqlx-cli, run the command below. This assumes you already have the Rust toolchains installed; if not, please refer to the Rust toolchain section in the main [README](https://github.com/santhosh7403/realworld-app-leptos-axum/blob/main/README.md).
+To install sqlx-cli, run the command below. This assumes you already have the Rust toolchains installed; if not, please refer to the Rust toolchain section in the main [README](https://github.com/santhosh7403/axum-session-auth-realworld-app-leptos-postgres/blob/main/README.md).
 
 `cargo install sqlx-cli`  - this installs sqlx utility
 
 Now, from the project root folder, run the following commands to create the database and run the initialization SQL scripts located in the migrations folder.
 
 ```
-cd realworld-app-leptos-axum
+cd axum-session-auth-realworld-app-leptos-postgres
 
 source .env
 
@@ -103,7 +103,7 @@ sqlx database setup
 Here is a quick reference for other commands available with the sqlx utility:
 
 ```
-santhosh@fedora:~/realworld-app-leptos-axum$ sqlx 
+santhosh@fedora:~/axum-session-auth-realworld-app-leptos-postgres$ sqlx 
 Command-line utility for SQLx, the Rust SQL toolkit.
 
 Usage: sqlx [OPTIONS] <COMMAND>
@@ -119,7 +119,7 @@ Options:
       --no-dotenv  Do not automatically load `.env` files
   -h, --help       Print help
   -V, --version    Print version
-santhosh@fedora:~/realworld-app-leptos-axum$ sqlx database
+santhosh@fedora:~/axum-session-auth-realworld-app-leptos-postgres$ sqlx database
 Group of commands for creating and dropping your database
 
 Usage: sqlx database <COMMAND>
