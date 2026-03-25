@@ -18,87 +18,77 @@ struct EmailCredentials {
 #[cfg(feature = "ssr")]
 static EMAIL_CREDS: std::sync::OnceLock<EmailCredentials> = std::sync::OnceLock::new();
 
-#[cfg(feature = "ssr")]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub(crate) struct TokenClaims {
-    pub sub: String,
-    pub exp: usize,
-}
-
-#[cfg(feature = "ssr")]
-pub(crate) fn decode_token(
-    token: &str,
-) -> Result<jsonwebtoken::TokenData<TokenClaims>, jsonwebtoken::errors::Error> {
-    let secret = env!("JWT_SECRET");
-    jsonwebtoken::decode::<TokenClaims>(
-        token,
-        &jsonwebtoken::DecodingKey::from_secret(secret.as_bytes()),
-        &jsonwebtoken::Validation::default(),
-    )
-}
-
-#[cfg(feature = "ssr")]
-pub(crate) fn encode_token(token_claims: TokenClaims) -> jsonwebtoken::errors::Result<String> {
-    let secret = env!("JWT_SECRET");
-    jsonwebtoken::encode(
-        &jsonwebtoken::Header::default(),
-        &token_claims,
-        &jsonwebtoken::EncodingKey::from_secret(secret.as_bytes()),
-    )
-}
-
 #[tracing::instrument]
 #[server(ResetPasswordAction1, "/api")]
 pub async fn reset_password_1(email: String) -> Result<String, ServerFnError> {
-    if let Err(x) = crate::models::User::get_email(email.clone()).await {
-        let err = format!("Bad email ID: Provided email not found.");
-        tracing::error!("{err} {x:?} ");
-        return Err(ServerFnError::new(err));
+    let db = crate::database::get_db();
+    let user_id = match sqlx::query_scalar!("SELECT id FROM Users WHERE email=$1", email)
+        .fetch_one(db)
+        .await
+    {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::error!("Bad email ID: Provided email not found. {:?}", e);
+            return Err(ServerFnError::new("Provided email not found."));
+        }
+    };
+
+    // Clean up expired tokens
+    let _ = sqlx::query!("DELETE FROM password_reset_tokens WHERE expires_at < NOW()")
+        .execute(db)
+        .await;
+
+    let creds = EMAIL_CREDS.get_or_init(|| EmailCredentials {
+        email: env::var("MAILER_EMAIL").unwrap_or_default(),
+        passwd: env::var("MAILER_PASSWD").unwrap_or_default(),
+        smtp_server: env::var("MAILER_SMTP_SERVER").unwrap_or_default(),
+    });
+
+    let host = leptos_axum::extract::<axum_extra::typed_header::TypedHeader<headers::Host>>()
+        .await?
+        .0;
+
+    let scheme = if cfg!(debug_assertions) {
+        "http"
     } else {
-        let creds = EMAIL_CREDS.get_or_init(|| EmailCredentials {
-            email: env::var("MAILER_EMAIL").unwrap(),
-            passwd: env::var("MAILER_PASSWD").unwrap(),
-            smtp_server: env::var("MAILER_SMTP_SERVER").unwrap(),
-        });
-        let host = leptos_axum::extract::<axum_extra::typed_header::TypedHeader<headers::Host>>()
-            .await?
-            .0;
-        let schema = if cfg!(debug_assertions) {
-            "http"
-        } else {
-            "https"
-        };
-        let token = crate::auth::encode_token(crate::auth::TokenClaims {
-            sub: email.clone(),
-            exp: (sqlx::types::chrono::Utc::now().timestamp() as usize) + 3_600,
-        })
-        .unwrap();
-        let uri = format!("{}://{}/reset_password?token={}", schema, host, token);
-        // Build a simple multipart message
-        let message = mail_send::mail_builder::MessageBuilder::new()
-            .from(("Realworld Leptos", creds.email.as_str()))
-            .to(vec![("You", email.as_str())])
-            .subject("Your password reset from realworld leptos")
-            .text_body(format!(
-                "You can reset your password accessing the following link: {uri}"
-            ));
+        "https"
+    };
 
-        // Connect to the SMTP submissions port, upgrade to TLS and
-        // authenticate using the provided credentials.
-        leptos::logging::log!("The email is {:?}", message);
+    let token = nanoid::nanoid!();
+    sqlx::query!(
+        "INSERT INTO password_reset_tokens(user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL '2 days')",
+        user_id,
+        token
+    )
+    .execute(db)
+    .await
+    .map_err(|e| ServerFnError::new(e.to_string()))?;
 
-        // ********* UNCOMMENT IF NEEDED *********
-        // if smtp available, then uncomment below mail send part. Else use above logging to get a reset link to test
-        // Incorrect smtp may cause the thread to panic after multiple attempts
+    let uri = format!("{}://{}/reset_password?token={}", scheme, host, token);
 
-        // mail_send::SmtpClientBuilder::new(creds.smtp_server.as_str(), 587)
-        //     .implicit_tls(false)
-        //     .credentials((creds.email.as_str(), creds.passwd.as_str()))
-        //     .connect()
-        //     .await?
-        //     .send(message)
-        //     .await?
-    }
+    // Keeping email builder commented and printing URI for testing
+    /*
+    let message = mail_send::mail_builder::MessageBuilder::new()
+        .from(("Realworld Leptos", creds.email.as_str()))
+        .to(vec![("You", email.as_str())])
+        .subject("Your password reset from realworld leptos")
+        .text_body(format!(
+            "You can reset your password accessing the following link: {uri}"
+        ));
+
+    leptos::logging::log!("The email is {:?}", message);
+    mail_send::SmtpClientBuilder::new(creds.smtp_server.as_str(), 587)
+        .implicit_tls(false)
+        .credentials((creds.email.as_str(), creds.passwd.as_str()))
+        .connect()
+        .await?
+        .send(message)
+        .await?
+    */
+
+    tracing::info!("PASSWORD RESET URI: {}", uri);
+    println!("PASSWORD RESET URI: {}", uri);
+
     return Ok(String::from(
         "Email sent. Check email and click the reset url link inside.",
     ));
@@ -116,25 +106,40 @@ pub async fn reset_password_2(
             "Passwords do not match, please retry!".to_string(),
         ));
     }
-    let Ok(claims) = decode_token(token.as_str()) else {
-        tracing::info!("Invalid token provided");
-        return Err(ServerFnError::new("Invalid token provided!".to_string()));
+
+    let db = crate::database::get_db();
+    let record = sqlx::query!(
+        "SELECT u.email FROM password_reset_tokens t JOIN Users u ON u.id = t.user_id WHERE t.token=$1 AND t.expires_at > NOW()",
+        token
+    )
+    .fetch_optional(db)
+    .await
+    .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    let Some(rec) = record else {
+        tracing::info!("Invalid or expired token provided");
+        return Err(ServerFnError::new(
+            "Invalid or expired token provided!".to_string(),
+        ));
     };
-    let email = claims.claims.sub;
+
+    let email = rec.email;
     let Ok(user) = crate::models::User::get_email(email.clone()).await else {
         tracing::info!("User does not exist");
         return Err(ServerFnError::new("User does not exist!".to_string()));
     };
+
     match user.set_password(password) {
         Ok(u) => {
             if let Err(error) = u.update().await {
                 tracing::error!(email, ?error, "error while resetting the password");
                 return Err(ServerFnError::new(error.to_string()));
             } else {
-                // A real password reset would have a list of issued tokens and invalidation over
-                // the used ones. As this would grow much bigger in complexity, I prefer to write
-                // down this security vulnerability and left it simple :)
-                // message = String::from("Password successfully reset, please, proceed to login");
+                // Delete the utilized token
+                let _ = sqlx::query!("DELETE FROM password_reset_tokens WHERE token=$1", token)
+                    .execute(db)
+                    .await;
+
                 return Ok("Password successfully changed, please, proceed to login".to_string());
             }
         }
