@@ -25,23 +25,6 @@ This approach is particularly well-suited for traditional web applications and d
 
 I started with the original Leptos/Postgres implementation and adapted it to use session-based authentication as an exploration of different auth patterns in Rust fullstack applications.
 
-## Modified axum_session Version
-
-**Note**: This repository uses a **modified version** of `axum_session` and `axum_session_sqlx` to optimize database write patterns. This modification throttles frequent writes to the session table, reducing database load and improving performance. The `Cargo.toml` is configured to use this custom branch:
-
-```toml
-axum_session = { git = "https://github.com/santhosh7403/AxumSession.git", branch = "feature/throttle-db-updates", features = ["key-store"], optional = true }
-axum_session_sqlx = { git = "https://github.com/santhosh7403/AxumSession.git", branch = "feature/throttle-db-updates", features = ["postgres"], optional = true }
-```
-
-If you prefer to use the stable version from crates.io, you can update `Cargo.toml` to:
-```toml
-axum_session = { version = "0.18", features = ["key-store"], optional = true }
-axum_session_sqlx = { version = "0.7", features = ["postgres"], optional = true }
-```
-
-This modification is intended to be submitted as a PR to the upstream `axum_session` project.
-
 
 Before proceeding, you can view the application's functionality via the[ screenshots here ](https://github.com/santhosh7403/axum-session-auth-realworld-app-leptos-postgres/blob/main/App_Screenshots.md).
 
@@ -65,7 +48,7 @@ This application leverages the following core technologies and features:
 
 ---
 
-## ⚙️ Installation and Setup
+## ⚙️ Install and Run
 
 **Prerequisites**
 
@@ -149,13 +132,17 @@ Another blog post on [PostgreSQL Full Text Search](https://iniakunhuda.medium.co
 
 If you are looking for this same application with different frameworks or databases, check out these versions:
 
-| Framework | Database | Auth Type | Repository |
-| :--- | :--- | :--- | :--- |
-| **Leptos** | PostgreSQL | Session | *This Repository* |
-| **Leptos** | PostgreSQL | JWT | [View Repo](https://github.com/santhosh7403/realworld-app-leptos-axum) |
-| **Leptos** | SQLite | JWT | [View Repo](https://github.com/santhosh7403/realworld-app-leptos-axum-sqlite) |
-| **Dioxus** | SQLite | Session | [View Repo](https://github.com/santhosh7403/axum-session-auth-realworld-app-dioxus-sqlite) |
-| **Dioxus** | SQLite | JWT | [View Repo](https://github.com/santhosh7403/realworld-app-dioxus-sqlite) |
+
+| Framework | Database | Auth Type | Auth Crates | Special Feature | Repository |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Leptos** | PostgreSQL | Session | axum_session, axum_session_auth | | *This Repository* |
+| **Dioxus** | SQLite | Session | axum_session, axum_session_auth | | [View Repo](https://github.com/santhosh7403/axum-session-auth-realworld-app-dioxus-sqlite) |
+| **Dioxus** | SQLite | Session | tower_sessions, axum_login | superadmin, fine grained authorization | [View Repo](https://github.com/santhosh7403/tower-sessions-axum-login-realworld-app-dioxus-sqlite) |
+| **Dioxus** | SQLite | PASETO | pasetors | superadmin, fine grained authorization | [View Repo](https://github.com/santhosh7403/paseto-auth-realworld-app-dioxus-sqlite) |
+| **Leptos** | PostgreSQL | JWT | jsonwebtoken | | [View Repo](https://github.com/santhosh7403/realworld-app-leptos-axum) |
+| **Leptos** | SQLite | JWT | jsonwebtoken | | [View Repo](https://github.com/santhosh7403/realworld-app-leptos-axum-sqlite) |
+| **Dioxus** | SQLite | JWT | jsonwebtoken | | [View Repo](https://github.com/santhosh7403/realworld-app-dioxus-sqlite) |
+
 
 
 ## 🙏 Inspiration and Acknowledgements
@@ -172,6 +159,6 @@ This particular version was initiated during the transition from Leptos 0.6 to 0
 
 *   An updated, non-reloading pagination method for search results.
 
-*   Dark mode styling and user prefernce persistence.
+*   Dark mode styling and user preference persistence.
 
 *   Implementation of Session based auth.

@@ -17,7 +17,7 @@ async fn main() {
 
     tracing_subscriber::fmt()
         .with_level(true)
-        .with_max_level(tracing::Level::DEBUG)
+        .with_max_level(tracing::Level::INFO)
         .init();
     // Init the pool into static
     database::init_db()
@@ -28,7 +28,7 @@ async fn main() {
 
     // Session Layer Config
     let session_config = axum_session::SessionConfig::default()
-        .with_db_update_interval(chrono::Duration::try_seconds(30).unwrap_or_default())
+        .with_db_update_interval(chrono::Duration::try_seconds(300).unwrap_or_default())
         .with_table_name("sessions_table");
 
     let session_store = axum_session::SessionStore::<axum_session_sqlx::SessionPgPool>::new(

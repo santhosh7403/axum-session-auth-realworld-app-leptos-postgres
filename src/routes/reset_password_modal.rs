@@ -38,7 +38,7 @@ pub async fn reset_password_1(email: String) -> Result<String, ServerFnError> {
         .execute(db)
         .await;
 
-    let creds = EMAIL_CREDS.get_or_init(|| EmailCredentials {
+    let _creds = EMAIL_CREDS.get_or_init(|| EmailCredentials {
         email: env::var("MAILER_EMAIL").unwrap_or_default(),
         passwd: env::var("MAILER_PASSWD").unwrap_or_default(),
         smtp_server: env::var("MAILER_SMTP_SERVER").unwrap_or_default(),
